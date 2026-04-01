@@ -138,3 +138,34 @@ if command -v createrepo >/dev/null 2>&1; then
 fi
 
 log "✅ Build, validation, and publishing complete!"
+# --- Notification Setup ---
+# Choose either Slack or Telegram
+SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXXXX/XXXXX/XXXXX"  # Replace with your Slack Incoming Webhook URL
+TELEGRAM_BOT_TOKEN="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"  # Replace with your bot token
+TELEGRAM_CHAT_ID="987654321"  # Replace with your chat/group ID
+
+notify_slack() {
+    local message="$1"
+    if [ -n "$SLACK_WEBHOOK_URL" ]; then
+        curl -s -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"$message\"}" "$SLACK_WEBHOOK_URL" >/dev/null
+    fi
+}
+
+notify_telegram() {
+    local message="$1"
+    if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
+        curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendMessage" \
+            -d chat_id="$TELEGRAM_CHAT_ID" \
+            -d text="$message" >/dev/null
+    fi
+}
+
+# --- Notify on completion ---
+MESSAGE="✅ Wayland RPM build complete: version $MAIN_VER, release $RELEASE
+RPMs: $BUILD_DIR/RPMS/
+SRPMs: $BUILD_DIR/SRPMS/"
+
+log "Sending notifications..."
+notify_slack "$MESSAGE"
+notify_telegram "$MESSAGE"
