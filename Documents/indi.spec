@@ -1,7 +1,6 @@
 #
-# This is not a mistake. Indi libraries have symbols that are defined in other
-# indi libraries. At the stage of linking the target application, everything
-# will be resolved.
+# This is intentional. INDI libraries may reference symbols defined in other
+# INDI libraries. At final application link stage, those symbols are resolved.
 #
 %set_verify_elf_method none
 
@@ -18,16 +17,16 @@
 %def_with qt
 
 #
-# Upstream provides static libraries for some of its components, despite
-# the fact that static library building is disabled in CMake.
+# Upstream still produces some static archives even when static builds are
+# disabled in CMake. Disable LTO to avoid linker/packaging issues.
 # See https://www.altlinux.org/LTO
 #
 %define optflags_lto %nil
 
-%global descr INDI is a distributed control protocol designed to operate\
-astronomical instrumentation. INDI is small, flexible, easy to parse,\
-and scalable. It supports common DCS functions such as remote control,\
-data acquisition, monitoring, and a lot more.
+%global descr INDI is a distributed control protocol designed to operate \
+astronomical instrumentation. INDI is small, flexible, easy to parse, \
+and scalable. It supports common DCS functions such as remote control, \
+data acquisition, monitoring, and much more.
 
 %global soversion 2
 
@@ -36,7 +35,7 @@ Version: 2.1.9
 Release: alt3
 
 Summary: Instrument Neutral Distributed Interface
-License: GPL-2.0-or-later AND LGPL-2.1-or-later AND LGPL-2.0-or-later and BSD-3-Clause AND ISC AND MIT AND CFITSIO
+License: GPL-2.0-or-later AND LGPL-2.1-or-later AND LGPL-2.0-or-later AND BSD-3-Clause AND ISC AND MIT
 Group: System/Libraries
 Url: https://indilib.org
 Vcs: https://github.com/indilib/indi.git
@@ -45,7 +44,7 @@ Source: %name-%version.tar
 Patch0: fix-indi2-ALT-SharedLibsPolicy-CMakeLists.txt.patch
 Patch1: fix-indi2-ALT-vtable_undefined_symbol-CMakeLists.txt.patch
 
-BuildRequires(Pre): rpm-build-cmake
+BuildRequires(pre): rpm-build-cmake
 BuildRequires: cmake
 BuildRequires: gcc-c++
 BuildRequires: ninja-build
@@ -90,46 +89,44 @@ Obsoletes: indilib <= 1.9.0-alt3
 %descr
 
 %package -n lib%name-common
-Summary: %name common package
+Summary: Common files for %name
 Group: System/Configuration/Other
 BuildArch: noarch
 Obsoletes: indilib-common <= 1.9.0-alt3
 
 %description -n lib%name-common
 %descr
-%summary.
 
 %package -n lib%name%soversion
 Group: System/Libraries
-Summary: %summary
+Summary: Shared libraries for %name
 Requires: lib%name-common
 Provides: libindi
 Obsoletes: libindi <= 1.9.0-alt3
 
 %description -n lib%name%soversion
 %descr
-%summary.
 
 %package -n lib%name-devel
 Group: Development/C++
-Summary: Development files for the %name
+Summary: Development files for %name
 Requires: lib%name%soversion
 Provides: indi-devel
 Provides: indilib-devel
 
 %description -n lib%name-devel
 %descr
-%summary.
 
+%if_with static
 %package -n lib%name-devel-static
 Group: Development/C++
-Summary: Static libraries from %name
+Summary: Static libraries for %name
 Requires: lib%name-devel
 Conflicts: libindi-devel < 1.8.9-alt1
 
 %description -n lib%name-devel-static
 %descr
-%summary.
+%endif
 
 %prep
 %setup
@@ -153,11 +150,18 @@ Conflicts: libindi-devel < 1.8.9-alt1
 %install
 %cmake_install
 
+# Remove stray static archives if static packaging is disabled.
+%if_without static
+find %buildroot%_libdir -type f -name '*.a' -delete
+%endif
+
 %check
+%if_with check
 pushd %_cmake__builddir
-# This is not an error. The test fails due to hasher limitations.
-ctest -E IndiserverSingleDriver.DontLeakFds
+# This is not a packaging error. The test fails under hasher limitations.
+ctest --output-on-failure -E IndiserverSingleDriver.DontLeakFds
 popd
+%endif
 
 %files
 %_bindir/%{name}_Excalibur
@@ -390,5 +394,7 @@ popd
 %endif
 %_pkgconfigdir/lib%{name}.pc
 
+%if_with static
 %files -n lib%name-devel-static
-%_libdir/lib%{name}AlignmentClient.a
+%_libdir/*.a
+%endif
